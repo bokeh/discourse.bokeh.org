@@ -1,0 +1,58 @@
+name: Deploy archive review
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - name: Download and verify frozen public snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag=$(python3 -c 'import json; print(json.load(open("snapshot.json"))["tag"])')
+          gh release download "$tag" --pattern bokeh-discourse-archive.zip
+          python3 - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+          manifest = json.load(open('snapshot.json'))
+          archive = Path('bokeh-discourse-archive.zip')
+          with archive.open('rb') as source:
+              assert hashlib.file_digest(source, 'sha256').hexdigest() == manifest['sha256']
+          with zipfile.ZipFile(archive) as bundle:
+              assert bundle.testzip() is None
+              for item in bundle.infolist():
+                  path = Path(item.filename)
+                  assert not path.is_absolute() and '..' not in path.parts
+              bundle.extractall('_site')
+          PY
+      - name: Prepare review project paths
+        run: python3 prepare.py _site --base-path /discourse.bokeh.org/
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy review
+        id: deployment
+        uses: actions/deploy-pages@v4
