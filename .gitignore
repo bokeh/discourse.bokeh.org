@@ -1,0 +1,13 @@
+.venv/
+.cache/
+__pycache__/
+*.pyc
+archive/site/
+archive/source/
+archive/*.sqlite*
+archive/*.zip
+archive/*-report.json
+archive/capture-counts.json
+archive/media-to-review.json
+archive/validation.json
+archive/package-manifest.json

@@ -1,0 +1,49 @@
+name: Rebuild archive from sources
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - archive/**
+      - vendor/**
+      - rebuild.py
+      - requirements-build.txt
+      - source-snapshot.json
+      - .github/workflows/rebuild.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install build dependencies and vendored Chronicon
+        run: python -m pip install -r requirements-build.txt
+      - name: Fetch pinned capture inputs from GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p .cache
+          gh release download "$(python -c 'import json; print(json.load(open("snapshot.json"))["tag"])')" --pattern bokeh-discourse-archive.zip --dir .cache
+          gh release download "$(python -c 'import json; print(json.load(open("source-snapshot.json"))["tag"])')" --pattern public-source-2026-10-28.zip --dir .cache
+      - name: Rebuild and validate the complete archive without production access
+        run: python -u rebuild.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rebuilt-archive
+          path: |
+            archive/bokeh-discourse-archive.zip
+            archive/validation.json
+            archive/package-manifest.json
+          compression-level: 0
+          retention-days: 7

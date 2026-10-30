@@ -1,0 +1,15 @@
+{
+  "tag": "review-2026-10-30",
+  "asset": "public-source-2026-10-28.zip",
+  "sha256": "1222105de01460d4eb5bfeea66e66a204c3fbbc3b38dab13c369a771424a1c74",
+  "public_export_sha256": "4dc82f76f9a1148c67ea6b6f5d16d43ee067d6a86fc6314b1f0c295cad2bb12c",
+  "categories": [
+    5,
+    9,
+    13
+  ],
+  "topics": 7149,
+  "posts": 35823,
+  "uploads": 5357,
+  "additional_media": 583
+}
