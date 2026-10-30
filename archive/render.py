@@ -90,7 +90,7 @@ for page,start in enumerate(range(0,len(files),100),1):
     path.write_text(template.render(depth=1))
 
 table=''.join(f'<tr><td>{html.escape(name)}</td><td>{c["topics"]:,}</td><td>{c["posts"]:,}</td></tr>' for name,c in counts['categories'].items())
-content=f'<h1>Archive capture report</h1><p>Public snapshot captured {html.escape(counts["captured_at"])}. The live forum has not been modified.</p><table class="topic-table"><thead><tr><th>Category</th><th>Topics</th><th>Public posts</th></tr></thead><tbody>{table}</tbody></table><p>{len(files):,} original uploaded files and avatar files preserved. {len(report["failures"])} file downloads failed.</p><p>Deleted, hidden, author-withdrawn, private, unlisted, and staff-only whisper content is excluded. External projects remain links rather than embedded applications.</p>'
+content=f'<h1>Archive capture report</h1><p>Public snapshot captured {html.escape(counts["captured_at"])}.</p><table class="topic-table"><thead><tr><th>Category</th><th>Topics</th><th>Public posts</th></tr></thead><tbody>{table}</tbody></table><p>{len(files):,} original uploaded files and avatar files preserved. {len(report["failures"])} file downloads failed.</p><p>Deleted, hidden, author-withdrawn, private, unlisted, and staff-only whisper content is excluded. External projects remain links rather than embedded applications.</p>'
 extra=json.loads((ROOT/'additional-media-report.json').read_text())
 content+=f'<p>{len(extra["files"]):,} additional publicly embedded media files were preserved. {len(extra["failures"])} historical media references are unavailable from their sources.</p><details><summary>Unavailable historical media</summary><ul>'
 for failure in extra['failures']:

@@ -53,6 +53,8 @@ def main():
         document.close()
         result = ''.join(document.output)
         result = result.replace('Local archive review ·', 'Archive review ·')
+        result = result.replace(' · The live forum is unchanged', '')
+        result = result.replace(' The live forum has not been modified.', '')
         path.write_text(result)
         count += 1
     resolver = site / 'assets/js/resolve-route.js'
