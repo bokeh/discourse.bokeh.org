@@ -1,8 +1,8 @@
 # Bokeh Discourse archive
 
-[Review the archive](https://bokeh.github.io/discourse.bokeh.org/).
+[Browse the archive](https://discourse.bokeh.org/).
 
-The live forum and `discourse.bokeh.org` remain unchanged. This repository has no custom domain or `CNAME` file. The review copy asks search engines not to index it.
+The live forum is retained in read-only mode during cutover. The GitHub Pages deployment serves the static archive at the domain root.
 
 The October 28, 2026 public snapshot contains 7,149 topics and 35,823 posts from Showcase, Announcements, and Community Support. It preserves 5,357 public uploads and avatars, plus 583 additional media files. Thirty-eight unavailable historical external media sources are documented in the capture report.
 
@@ -39,24 +39,16 @@ python -m http.server 8769 --bind 127.0.0.1 --directory archive/site
 
 Open http://127.0.0.1:8769/. The generated ZIP is `archive/bokeh-discourse-archive.zip`. Generated output is ignored by Git. The rebuilt site has the same captured content and routes. ZIP timestamps, generation metadata, and file ordering need not be byte-identical.
 
-## Publish the review copy
+## Publish a snapshot
 
-**Actions → Deploy archive review → Run workflow** deploys the currently pinned rendered ZIP. Its `prepare.py` adapter adjusts links, search, and historical URL fallback for `/discourse.bokeh.org/`. Changes to the source builder do not automatically replace the review site.
+**Actions → Deploy Discourse archive → Run workflow** deploys the pinned rendered ZIP. The `prepare.py` adapter prepares domain-root links, search, and historical URL fallback. Changes to the source builder do not automatically replace the published snapshot.
 
-Publishing a rebuilt snapshot is a separate step. Preserve it as a new Release asset and update `snapshot.json` after reviewing the output. Do not configure a custom domain or change DNS as part of a review deployment.
+Publishing a rebuilt snapshot is a separate step. Preserve it as a new Release asset and update `snapshot.json` after reviewing the output.
 
-## Prepare discourse.bokeh.org without a cutover
+## Production hosting
 
-The existing snapshot can be adapted for the domain root without recapturing or rebuilding the forum content. In **Actions → Deploy archive review → Run workflow**, select **production** to build a `production-archive` download. That run validates all content and media using the frozen source manifests, then packages the domain-root site. Its deploy job is skipped. It never changes DNS or the Pages custom-domain setting.
+The archive is prepared for `https://discourse.bokeh.org/` at the domain root. The normal Pages workflow validates all public posts, links, and preserved media before deploying. Content pages are indexable. Redirect aliases and the 404 page retain their intentional `noindex` metadata.
 
-For an already extracted, unprepared snapshot, the equivalent command is:
+In **Actions → Deploy Discourse archive → Run workflow**, select **production** to create a downloadable `production-archive` package without deploying. This uses the same preparation and validation as a deployment. Artifacts are retained for 14 days.
 
-```sh
-python prepare.py path/to/site --base-path / --production
-```
-
-The production output uses `/t/...`, `/assets/...`, and `/pagefind/...` directly. Content pages are indexable and the header identifies the site as a read-only archive. Redirect aliases and the 404 page retain their intentional `noindex` metadata. Search and historical numeric/old-slug routing use the same hosting helpers as the review copy.
-
-The existing github.io project URL continues to use `/discourse.bokeh.org/` and retains its review-copy `noindex,nofollow` metadata, with neutral archive wording. A production preparation run creates a downloadable tarball and validation report retained for 14 days. Extract the tarball into a web root to inspect it. It can be regenerated from the same pinned snapshot later.
-
-Publishing the production output and assigning `discourse.bokeh.org` are separate cutover actions. A successful preparation run does not perform either action.
+The source snapshot remains frozen. DNS and the Pages custom-domain setting are managed separately from workflow runs. Attachment files remain available from their original posts. There is no standalone attachment index.

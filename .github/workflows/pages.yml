@@ -1,4 +1,4 @@
-name: Deploy archive review
+name: Deploy Discourse archive
 on:
   workflow_dispatch:
     inputs:
@@ -11,6 +11,7 @@ on:
     paths:
       - snapshot.json
       - prepare.py
+      - .github/workflows/pages.yml
 
 permissions:
   contents: read
@@ -48,14 +49,9 @@ jobs:
           PY
       - name: Check review and production preparation
         run: python3 -m unittest discover -s tests
-      - name: Prepare review project paths
-        if: ${{ inputs.production != true }}
-        run: python3 prepare.py _site --base-path /discourse.bokeh.org/
-      - name: Prepare final-domain archive without deploying
-        if: ${{ inputs.production == true }}
+      - name: Prepare the domain-root archive
         run: python3 prepare.py _site --base-path / --production
       - name: Validate the complete production archive
-        if: ${{ inputs.production == true }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -99,6 +95,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy review
+      - name: Deploy archive
         id: deployment
         uses: actions/deploy-pages@v4
