@@ -62,7 +62,7 @@ def main():
         document.feed(path.read_text())
         document.close()
         result = ''.join(document.output)
-        result = re.sub(r'<a href="[^"]*attachments/index\.html">♧ &nbsp; Attachments</a>', '', result)
+        result = re.sub(r'<a href="[^"]*attachments/index\.html">♧ (?:&nbsp;|\u00a0) Attachments</a>', '', result)
         result = result.replace('Local archive review ·', 'Archive review ·')
         result = result.replace(' · The live forum is unchanged', '')
         result = result.replace(' The live forum has not been modified.', '')
