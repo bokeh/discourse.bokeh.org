@@ -1,6 +1,11 @@
 name: Deploy archive review
 on:
   workflow_dispatch:
+    inputs:
+      production:
+        description: Build the final-domain archive as a download only (never deploy)
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -11,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: ${{ inputs.production == true && 'production-preparation' || 'pages' }}
   cancel-in-progress: false
 
 jobs:
@@ -41,12 +46,50 @@ jobs:
                   assert not path.is_absolute() and '..' not in path.parts
               bundle.extractall('_site')
           PY
+      - name: Check review and production preparation
+        run: python3 -m unittest discover -s tests
       - name: Prepare review project paths
+        if: ${{ inputs.production != true }}
         run: python3 prepare.py _site --base-path /discourse.bokeh.org/
+      - name: Prepare final-domain archive without deploying
+        if: ${{ inputs.production == true }}
+        run: python3 prepare.py _site --base-path / --production
+      - name: Validate the complete production archive
+        if: ${{ inputs.production == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p .cache _validation
+          gh release download "$(python3 -c 'import json; print(json.load(open("source-snapshot.json"))["tag"])')" --pattern public-source-2026-10-28.zip --dir .cache
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          from rebuild import asset, extract
+          source = json.load(open('source-snapshot.json'))
+          extract(asset(source, source['asset']), Path('_validation'))
+          PYCODE
+          cp archive/validate.py _validation/validate.py
+          ln -s "$PWD/_site" _validation/site
+          python3 _validation/validate.py
+      - name: Package the production archive
+        if: ${{ inputs.production == true }}
+        run: tar -C _site -czf production-archive.tar.gz .
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.production == true }}
+        with:
+          name: production-archive
+          path: |
+            production-archive.tar.gz
+            _validation/validation.json
+          compression-level: 0
+          retention-days: 14
       - uses: actions/upload-pages-artifact@v4
+        if: ${{ inputs.production != true }}
         with:
           path: _site
   deploy:
+    if: ${{ inputs.production != true }}
     needs: build
     runs-on: ubuntu-latest
     permissions:

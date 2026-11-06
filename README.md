@@ -44,3 +44,19 @@ Open http://127.0.0.1:8769/. The generated ZIP is `archive/bokeh-discourse-archi
 **Actions → Deploy archive review → Run workflow** deploys the currently pinned rendered ZIP. Its `prepare.py` adapter adjusts links, search, and historical URL fallback for `/discourse.bokeh.org/`. Changes to the source builder do not automatically replace the review site.
 
 Publishing a rebuilt snapshot is a separate step. Preserve it as a new Release asset and update `snapshot.json` after reviewing the output. Do not configure a custom domain or change DNS as part of a review deployment.
+
+## Prepare discourse.bokeh.org without a cutover
+
+The existing snapshot can be adapted for the domain root without recapturing or rebuilding the forum content. In **Actions → Deploy archive review → Run workflow**, select **production** to build a `production-archive` download. That run validates all content and media using the frozen source manifests, then packages the domain-root site. Its deploy job is skipped. It never changes DNS or the Pages custom-domain setting.
+
+For an already extracted, unprepared snapshot, the equivalent command is:
+
+```sh
+python prepare.py path/to/site --base-path / --production
+```
+
+The production output uses `/t/...`, `/assets/...`, and `/pagefind/...` directly. Content pages are indexable and the header identifies the site as a read-only archive. Redirect aliases and the 404 page retain their intentional `noindex` metadata. Search and historical numeric/old-slug routing use the same hosting helpers as the review copy.
+
+The existing github.io project URL continues to use `/discourse.bokeh.org/` and retains its review-copy `noindex,nofollow` metadata, with neutral archive wording. A production preparation run creates a downloadable tarball and validation report retained for 14 days. Extract the tarball into a web root to inspect it. It can be regenerated from the same pinned snapshot later.
+
+Publishing the production output and assigning `discourse.bokeh.org` are separate cutover actions. A successful preparation run does not perform either action.
