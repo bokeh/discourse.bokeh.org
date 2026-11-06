@@ -52,6 +52,9 @@ def main():
     for topic_id in routes['topics']:
         alias = site / 't' / topic_id
         if alias.is_dir(): shutil.rmtree(alias)
+    # The frozen snapshot includes a standalone media index. Preserve only post links.
+    attachment_index = site / "attachments"
+    if attachment_index.is_dir(): shutil.rmtree(attachment_index)
     count = 0
     for path in site.rglob('*.html'):
         if not path.is_file(): continue
@@ -59,6 +62,7 @@ def main():
         document.feed(path.read_text())
         document.close()
         result = ''.join(document.output)
+        result = re.sub(r'<a href="[^"]*attachments/index\.html">♧ &nbsp; Attachments</a>', '', result)
         result = result.replace('Local archive review ·', 'Archive review ·')
         result = result.replace(' · The live forum is unchanged', '')
         result = result.replace(' The live forum has not been modified.', '')

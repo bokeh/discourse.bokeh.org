@@ -18,6 +18,11 @@ class PreparationTest(unittest.TestCase):
         (self.site / 'assets/js/resolve-route.js').write_text((ROOT / 'archive/hosting/resolve-route.js').read_text())
         (self.site / 'assets/js/search-init.js').write_text("new PagefindUI({element:'#search'});")
         self.html = '''<!doctype html><html><head><meta name="robots" content="noindex,nofollow"><link href="/assets/css/bokeh.css" rel="stylesheet"></head><body><span class="archive-badge">Read-only preview</span><div class="preview-note">Local archive review · Captured October 28, 2026 · The live forum is unchanged</div><main id="main-content"><a href="/t/example/42/">Topic</a><a href="https://github.com/bokeh/bokeh">GitHub</a><img src="/assets/uploads/image.png"><p>Original post says Read-only preview.</p></main></body></html>'''
+        self.html = self.html.replace('<main ', '<a href="attachments/index.html">♧ &nbsp; Attachments</a><main ')
+        (self.site / 'attachments').mkdir()
+        (self.site / 'attachments/index.html').write_text('Standalone index')
+        (self.site / 'assets/uploads').mkdir()
+        (self.site / 'assets/uploads/image.png').write_bytes(b'preserved attachment bytes')
         (self.site / 'index.html').write_text(self.html)
         alias = self.site / 't/example/42/2'
         alias.mkdir(parents=True)
@@ -29,7 +34,10 @@ class PreparationTest(unittest.TestCase):
 
     def test_production_root_metadata_links_and_post_redirects(self):
         self.prepare('--base-path', '/', '--production')
+        self.assertFalse((self.site / 'attachments').exists())
+        self.assertEqual((self.site / 'assets/uploads/image.png').read_bytes(), b'preserved attachment bytes')
         html = (self.site / 'index.html').read_text()
+        self.assertNotIn('♧ &nbsp; Attachments', html)
         self.assertNotIn('content="noindex,nofollow"', html)
         self.assertIn('class="archive-badge">Read-only archive</span>', html)
         self.assertIn('class="preview-note">Archived discussions · Captured October 28, 2026</div>', html)
@@ -46,7 +54,10 @@ class PreparationTest(unittest.TestCase):
 
     def test_review_prefix_and_noindex_remain(self):
         self.prepare('--base-path', '/discourse.bokeh.org/')
+        self.assertFalse((self.site / 'attachments').exists())
+        self.assertEqual((self.site / 'assets/uploads/image.png').read_bytes(), b'preserved attachment bytes')
         html = (self.site / 'index.html').read_text()
+        self.assertNotIn('♧ &nbsp; Attachments', html)
         self.assertIn('content="noindex,nofollow"', html)
         self.assertIn('href="/discourse.bokeh.org/t/example/42/"', html)
         self.assertIn('src="/discourse.bokeh.org/assets/uploads/image.png"', html)

@@ -76,19 +76,6 @@ for uid,u in upload_data.items():
     redirect(SITE/'uploads/short-url'/f'{base62}.{ext}'/'index.html','/'+by_id[uid]['path'])
 
 files=sorted(report['files'],key=lambda f:f['filename'].lower())
-for page,start in enumerate(range(0,len(files),100),1):
-    items=[]
-    for f in files[start:start+100]:
-        name=html.escape(f['filename'])
-        path='/'+f['path']
-        items.append(f'<li><a href="{path}" download="{html.escape(f["filename"],quote=True)}">{name}</a> <small>· {f["bytes"]:,} bytes</small></li>')
-    total=(len(files)+99)//100
-    paging='<nav class="paging">'+(f'<a href="{ "index.html" if page==2 else "page-"+str(page-1)+".html"}">← Previous</a>' if page>1 else '')+f'<span>Page {page} of {total}</span>'+(f'<a href="page-{page+1}.html">Next →</a>' if page<total else '')+'</nav>'
-    template=exporter.env.from_string('{% extends "base.html" %}{% block content %}<h1>Preserved attachments and media</h1><p>Original uploaded files and author avatars, preserved locally. Files are downloads; archived HTML/JavaScript attachments are not executed.</p>'+paging+'<ul class="attachment-list">'+''.join(items)+'</ul>'+paging+'{% endblock %}')
-    path=SITE/'attachments'/('index.html' if page==1 else f'page-{page}.html')
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(template.render(depth=1))
-
 table=''.join(f'<tr><td>{html.escape(name)}</td><td>{c["topics"]:,}</td><td>{c["posts"]:,}</td></tr>' for name,c in counts['categories'].items())
 content=f'<h1>Archive capture report</h1><p>Public snapshot captured {html.escape(counts["captured_at"])}.</p><table class="topic-table"><thead><tr><th>Category</th><th>Topics</th><th>Public posts</th></tr></thead><tbody>{table}</tbody></table><p>{len(files):,} original uploaded files and avatar files preserved. {len(report["failures"])} file downloads failed.</p><p>Deleted, hidden, author-withdrawn, private, unlisted, and staff-only whisper content is excluded. External projects remain links rather than embedded applications.</p>'
 extra=json.loads((ROOT/'additional-media-report.json').read_text())
@@ -100,4 +87,4 @@ template=exporter.env.from_string('{% extends "base.html" %}{% block content %}'
 (SITE/'archive-report.html').write_text(template.render(depth=0))
 (ROOT/'source/post-targets.json').write_text(json.dumps(post_positions))
 db.close()
-print('Rendered topic pages, category/index pagination, URL aliases, attachment library and project footer.',flush=True)
+print('Rendered topic pages, category/index pagination, URL aliases and project footer.',flush=True)
