@@ -49,6 +49,8 @@ Publishing a rebuilt snapshot is a separate step. Preserve it as a new Release a
 
 The archive is prepared for `https://discourse.bokeh.org/` at the domain root. The normal Pages workflow validates all public posts, links, and preserved media before deploying. Content pages are indexable. Redirect aliases and the 404 page retain their intentional `noindex` metadata.
 
+Production preparation generates a deterministic root-level `sitemap.xml` with absolute HTTPS URLs and adds its discovery URL to `robots.txt`. It includes public topic and category routes, their rendered pagination, archive listings, and the capture report. Directory indexes use trailing-slash URLs. Redirect aliases, search, fallback pages, attachments, and pages retaining `noindex` metadata are excluded. Review preparation removes the sitemap and its discovery directive.
+
 In **Actions → Deploy Discourse archive → Run workflow**, select **production** to create a downloadable `production-archive` package without deploying. This uses the same preparation and validation as a deployment. Artifacts are retained for 14 days.
 
 The source snapshot remains frozen. DNS and the Pages custom-domain setting are managed separately from workflow runs. Attachment files remain available from their original posts. There is no standalone attachment index.

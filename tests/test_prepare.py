@@ -5,6 +5,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from xml.etree import ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -17,6 +18,7 @@ class PreparationTest(unittest.TestCase):
         (self.site / 'route-map.json').write_text(json.dumps({'topics': {'42': 'example'}, 'categories': {}}))
         (self.site / 'assets/js/resolve-route.js').write_text((ROOT / 'archive/hosting/resolve-route.js').read_text())
         (self.site / 'assets/js/search-init.js').write_text("new PagefindUI({element:'#search'});")
+        (self.site / 'robots.txt').write_text('User-agent: *\nAllow: /\nDisallow: /archive.db\n')
         self.html = '''<!doctype html><html><head><meta name="robots" content="noindex,nofollow"><link href="/assets/css/bokeh.css" rel="stylesheet"></head><body><span class="archive-badge">Read-only preview</span><div class="preview-note">Local archive review · Captured October 28, 2026 · The live forum is unchanged</div><main id="main-content"><a href="/t/example/42/">Topic</a><a href="https://github.com/bokeh/bokeh">GitHub</a><img src="/assets/uploads/image.png"><p>Original post says Read-only preview.</p></main></body></html>'''
         self.html = self.html.replace('<main ', '<a href="attachments/index.html">♧ &nbsp; Attachments</a><main ')
         (self.site / 'archive-report.html').write_text(self.html.replace('&nbsp;', '\u00a0'))
@@ -66,6 +68,58 @@ class PreparationTest(unittest.TestCase):
         self.assertIn('src="/discourse.bokeh.org/assets/uploads/image.png"', html)
         self.assertIn('class="archive-badge">Read-only archive</span>', html)
         self.assertIn('baseUrl:"/discourse.bokeh.org/"', (self.site / 'assets/js/search-init.js').read_text())
+
+    def test_sitemap_selects_public_content_and_preserves_pagination(self):
+        routes = json.loads((self.site / 'route-map.json').read_text())
+        routes['categories'] = {'5': 'tips&tricks'}
+        (self.site / 'route-map.json').write_text(json.dumps(routes))
+        pages = {
+            't/example/42/index.html': self.html,
+            't/example/42/page-2.html': self.html,
+            't/example/42/page-10.html': self.html,
+            't/example/42/page-100.html': self.html,
+            't/example/42/page-3.html': '<meta name="robots" content="NOINDEX, follow">',
+            't/example/42/page-4.html': '<meta name="googlebot" content="none">',
+            't/example/42/page-5.html': '<meta http-equiv="refresh" content="0;url=/">',
+            't/private/99/index.html': self.html,
+            't/42/index.html': self.html,
+            'c/tips&tricks/5/index.html': self.html,
+            'c/tips&tricks/5/page-2.html': self.html,
+            'c/private/6/index.html': self.html,
+            'latest/index.html': self.html,
+            'latest/page-2.html': self.html,
+            'top/index.html': self.html,
+            'top/replies/index.html': self.html,
+            'top/views/index.html': self.html,
+            'search.html': self.html,
+            '404.html': self.html,
+            'uploads/short-url/file/index.html': self.html,
+        }
+        for name, content in pages.items():
+            path = self.site / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+        self.prepare('--base-path', '/', '--production')
+        sitemap = self.site / 'sitemap.xml'
+        root = ET.parse(sitemap).getroot()
+        self.assertEqual(root.tag, '{http://www.sitemaps.org/schemas/sitemap/0.9}urlset')
+        urls = [element.text for element in root.findall('{*}url/{*}loc')]
+        paths = ['', 'archive-report.html', 't/example/42/', 't/example/42/page-2.html',
+                 't/example/42/page-10.html', 't/example/42/page-100.html',
+                 'c/tips%26tricks/5/', 'c/tips%26tricks/5/page-2.html',
+                 'latest/', 'latest/page-2.html', 'top/', 'top/replies/', 'top/views/']
+        self.assertEqual(urls, sorted('https://discourse.bokeh.org/' + path for path in paths))
+        robots = (self.site / 'robots.txt').read_text()
+        self.assertIn('Disallow: /archive.db\n', robots)
+        self.assertEqual(robots.count('Sitemap: https://discourse.bokeh.org/sitemap.xml'), 1)
+
+    def test_review_removes_stale_sitemap_and_discovery(self):
+        (self.site / 'sitemap.xml').write_text('stale production sitemap')
+        with (self.site / 'robots.txt').open('a') as robots:
+            robots.write('Sitemap: https://discourse.bokeh.org/sitemap.xml\n')
+        self.prepare('--base-path', '/review')
+        self.assertFalse((self.site / 'sitemap.xml').exists())
+        self.assertNotIn('Sitemap:', (self.site / 'robots.txt').read_text())
 
     def test_production_rejects_project_prefix(self):
         result = self.prepare('--base-path', '/discourse.bokeh.org/', '--production', check=False)

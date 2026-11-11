@@ -5,6 +5,11 @@ import json
 from pathlib import Path
 import re
 import shutil
+from urllib.parse import quote
+from xml.etree import ElementTree as ET
+
+PRODUCTION_URL = "https://discourse.bokeh.org"
+SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
 
 class ProjectHTML(HTMLParser):
     def __init__(self, base, production=False):
@@ -12,6 +17,7 @@ class ProjectHTML(HTMLParser):
         self.base = base
         self.production = production
         self.output = []
+        self.indexable = True
 
     def start(self, tag, attrs):
         raw = self.get_starttag_text()
@@ -19,6 +25,12 @@ class ProjectHTML(HTMLParser):
         if (self.production and tag == 'meta' and attributes.get('name') == 'robots'
                 and attributes.get('content') == 'noindex,nofollow'):
             return
+        if tag == 'meta':
+            name = attributes.get('name', '').lower()
+            directives = re.split(r'[,\s]+', attributes.get('content', '').lower())
+            if (name in ('robots', 'googlebot') and {'noindex', 'none'} & set(directives)
+                    or attributes.get('http-equiv', '').lower() == 'refresh'):
+                self.indexable = False
         raw = re.sub(r'''(\b(?:href|src|poster|action)\s*=\s*["'])/(?!/)''',
                      lambda match: match[1] + self.base + '/', raw)
         if tag == 'meta':
@@ -33,6 +45,28 @@ class ProjectHTML(HTMLParser):
     def handle_charref(self, name): self.output.append(f'&#{name};')
     def handle_comment(self, data): self.output.append(f'<!--{data}-->')
     def handle_decl(self, decl): self.output.append(f'<!{decl}>')
+
+def sitemap_directories(routes):
+    """Select content directories from the public route map and archive listings."""
+    directories = {Path('.'), Path('latest'), Path('top'),
+                   Path('top/replies'), Path('top/views')}
+    for kind, prefix in (('topics', 't'), ('categories', 'c')):
+        for identifier, slug in routes[kind].items():
+            assert identifier.isdigit() and slug and '/' not in slug and slug not in ('.', '..')
+            directories.add(Path(prefix) / slug / identifier)
+    return directories
+
+def write_sitemap(site, urls):
+    ET.register_namespace('', SITEMAP_NAMESPACE)
+    root = ET.Element(f'{{{SITEMAP_NAMESPACE}}}urlset')
+    for url in sorted(urls):
+        entry = ET.SubElement(root, f'{{{SITEMAP_NAMESPACE}}}url')
+        ET.SubElement(entry, f'{{{SITEMAP_NAMESPACE}}}loc').text = url
+    assert 0 < len(urls) <= 50_000, 'Sitemap requires between 1 and 50,000 URLs'
+    ET.indent(root, space='  ')
+    content = ET.tostring(root, encoding='utf-8', xml_declaration=True) + b'\n'
+    assert len(content) <= 50 * 1024 * 1024, 'Sitemap exceeds 50 MB'
+    (site / 'sitemap.xml').write_bytes(content)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -55,6 +89,8 @@ def main():
     # The frozen snapshot includes a standalone media index. Preserve only post links.
     attachment_index = site / "attachments"
     if attachment_index.is_dir(): shutil.rmtree(attachment_index)
+    directories = sitemap_directories(routes)
+    sitemap_urls = set()
     count = 0
     for path in site.rglob('*.html'):
         if not path.is_file(): continue
@@ -70,6 +106,14 @@ def main():
                                 '<span class="archive-badge">Read-only archive</span>')
         result = result.replace('<div class="preview-note">Archive review ·',
                                 '<div class="preview-note">Archived discussions ·')
+        relative = path.relative_to(site)
+        canonical_page = (relative.parent in directories
+                          and re.fullmatch(r'index\.html|page-(?:[2-9]|[1-9][0-9]+)\.html', relative.name))
+        if args.production and document.indexable and (canonical_page or relative == Path('archive-report.html')):
+            canonical_path = relative.as_posix()
+            if relative.name == 'index.html':
+                canonical_path = canonical_path.removesuffix('index.html')
+            sitemap_urls.add(PRODUCTION_URL + '/' + quote(canonical_path, safe='/'))
         path.write_text(result)
         count += 1
     resolver = site / 'assets/js/resolve-route.js'
@@ -81,6 +125,15 @@ def main():
     search = site / 'assets/js/search-init.js'
     options = 'baseUrl:' + json.dumps(base + '/') + ',bundlePath:' + json.dumps(base + '/pagefind/') + ','
     search.write_text(search.read_text().replace('new PagefindUI({', 'new PagefindUI({' + options))
+    robots = site / 'robots.txt'
+    lines = [line for line in robots.read_text().splitlines()
+             if not line.lstrip().lower().startswith('sitemap:')]
+    if args.production:
+        write_sitemap(site, sitemap_urls)
+        lines.extend(['', f'Sitemap: {PRODUCTION_URL}/sitemap.xml'])
+    else:
+        (site / 'sitemap.xml').unlink(missing_ok=True)
+    robots.write_text('\n'.join(lines).rstrip() + '\n')
     size = sum(p.stat().st_size for p in site.rglob('*') if p.is_file())
     assert size < 1_000_000_000, f'Published site exceeds 1 GB: {size}'
     print(f'Prepared {count:,} HTML pages at {base}/. Published size: {size:,} bytes.', flush=True)
